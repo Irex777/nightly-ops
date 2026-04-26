@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Nightly Ops</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌙</text></svg>">
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="header-left">
+      <span class="logo">🌙</span>
+      <h1 class="header-title">Nightly Ops</h1>
+    </div>
+    <div class="header-right">
+      <div id="sse-status" class="sse-status" title="SSE disconnected">●</div>
+      <button id="sync-btn" class="btn btn-primary" title="Sync repos from GitHub">
+        <span class="btn-icon">↻</span> Sync
+      </button>
+    </div>
+  </header>
+
+  <!-- Tab Navigation -->
+  <nav class="tabs">
+    <button class="tab active" data-tab="repos">📦 Repos</button>
+    <button class="tab" data-tab="ideas">💡 Ideas</button>
+    <button class="tab" data-tab="results">📊 Results</button>
+    <button class="tab" data-tab="settings">⚙️ Settings</button>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="main">
+    <!-- Repos Tab -->
+    <section id="tab-repos" class="tab-content active">
+      <div class="tab-toolbar">
+        <div class="filter-group">
+          <select id="repos-filter" class="select-input">
+            <option value="all">All repos</option>
+            <option value="enabled">Enabled only</option>
+          </select>
+        </div>
+      </div>
+      <div id="repos-loading" class="loading">
+        <div class="skeleton-grid">
+          <div class="skeleton-card"></div>
+          <div class="skeleton-card"></div>
+          <div class="skeleton-card"></div>
+        </div>
+        <p>Loading repos…</p>
+      </div>
+      <div id="repos-empty" class="empty-state hidden">
+        <div class="empty-icon">📦</div>
+        <p>No repos yet. Click <strong>Sync</strong> to fetch from GitHub.</p>
+      </div>
+      <div id="repos-grid" class="card-grid hidden"></div>
+    </section>
+
+    <!-- Feature Ideas Tab -->
+    <section id="tab-ideas" class="tab-content">
+      <div class="tab-toolbar">
+        <div class="filter-group">
+          <select id="ideas-repo-filter" class="select-input">
+            <option value="all">All repos</option>
+          </select>
+          <select id="ideas-difficulty-filter" class="select-input">
+            <option value="all">All sizes</option>
+            <option value="S">S — Small</option>
+            <option value="M">M — Medium</option>
+            <option value="L">L — Large</option>
+          </select>
+          <select id="ideas-status-filter" class="select-input">
+            <option value="all">All statuses</option>
+            <option value="proposed">Proposed</option>
+            <option value="approved">Approved</option>
+            <option value="implemented">Implemented</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </div>
+        <button id="generate-ideas-btn" class="btn btn-primary btn-sm">
+          <span class="btn-icon">🧠</span> Generate Ideas
+        </button>
+      </div>
+      <div id="ideas-loading" class="loading hidden">
+        <div class="spinner"></div>
+        <p>Generating ideas with AI…</p>
+      </div>
+      <div id="ideas-empty" class="empty-state hidden">
+        <div class="empty-icon">💡</div>
+        <p>No feature ideas yet. Click <strong>Generate Ideas</strong> to analyze a repo.</p>
+      </div>
+      <div id="ideas-grid" class="card-grid hidden"></div>
+    </section>
+
+    <!-- Results Tab -->
+    <section id="tab-results" class="tab-content">
+      <div class="tab-toolbar">
+        <div class="filter-group">
+          <select id="results-status-filter" class="select-input">
+            <option value="all">All statuses</option>
+            <option value="running">Running</option>
+            <option value="completed">Completed</option>
+            <option value="failed">Failed</option>
+            <option value="pending">Pending</option>
+          </select>
+          <select id="results-type-filter" class="select-input">
+            <option value="all">All types</option>
+          </select>
+          <select id="results-repo-filter" class="select-input">
+            <option value="all">All repos</option>
+          </select>
+        </div>
+        <button id="run-nightly-btn" class="btn btn-primary btn-sm">
+          <span class="btn-icon">▶</span> Run Nightly Now
+        </button>
+      </div>
+      <div id="results-loading" class="loading hidden">
+        <div class="spinner"></div>
+        <p>Loading tasks…</p>
+      </div>
+      <div id="results-empty" class="empty-state hidden">
+        <div class="empty-icon">📊</div>
+        <p>No tasks yet. Enable repos and trigger a nightly run.</p>
+      </div>
+      <div id="results-list" class="results-list hidden"></div>
+    </section>
+
+    <!-- Settings Tab -->
+    <section id="tab-settings" class="tab-content">
+      <div class="settings-grid">
+        <div class="settings-card">
+          <h3>⏰ Schedule</h3>
+          <label class="settings-label">
+            Nightly run time
+            <input id="setting-schedule" type="time" value="02:00" class="input-field">
+          </label>
+        </div>
+        <div class="settings-card">
+          <h3>🚀 Runner</h3>
+          <label class="settings-label">
+            Max parallel tasks
+            <input id="setting-parallel" type="number" min="1" max="4" value="2" class="input-field">
+          </label>
+          <label class="settings-label">
+            Task timeout (minutes)
+            <input id="setting-timeout" type="number" min="10" max="60" value="30" class="input-field">
+          </label>
+        </div>
+        <div class="settings-card">
+          <h3>🧠 ZAI AI</h3>
+          <label class="settings-label">
+            API Key
+            <input id="setting-zai-key" type="password" placeholder="sk-..." class="input-field">
+          </label>
+          <button id="test-zai-btn" class="btn btn-ghost btn-sm" style="margin-top:8px;">Test ZAI Connection</button>
+          <div id="zai-test-result" class="test-result hidden"></div>
+        </div>
+        <div class="settings-card">
+          <h3>🤖 Claude Code</h3>
+          <button id="test-claude-btn" class="btn btn-ghost btn-sm">Test Claude Code</button>
+          <div id="claude-test-result" class="test-result hidden"></div>
+        </div>
+        <div class="settings-card settings-card-span">
+          <button id="save-settings-btn" class="btn btn-primary">Save Settings</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Repo Detail Slide-up Panel -->
+  <div id="detail-overlay" class="overlay hidden"></div>
+  <div id="detail-panel" class="detail-panel hidden">
+    <div class="detail-header">
+      <h2 id="detail-name"></h2>
+      <button id="detail-close" class="btn-icon-only" title="Close">✕</button>
+    </div>
+    <p id="detail-desc" class="detail-desc"></p>
+    <div class="detail-meta">
+      <span id="detail-lang" class="badge"></span>
+      <span id="detail-updated" class="meta-text"></span>
+    </div>
+    <hr class="divider">
+    <h3>Task Types</h3>
+    <div id="detail-tasks" class="task-checklist"></div>
+    <div class="detail-actions">
+      <button id="run-selected-btn" class="btn btn-primary" disabled>
+        <span class="btn-icon">▶</span> Run Selected
+      </button>
+    </div>
+  </div>
+
+  <!-- Idea Detail Panel -->
+  <div id="idea-overlay" class="overlay hidden"></div>
+  <div id="idea-panel" class="detail-panel hidden">
+    <div class="detail-header">
+      <h2 id="idea-title"></h2>
+      <button id="idea-close" class="btn-icon-only" title="Close">✕</button>
+    </div>
+    <div class="idea-meta-bar">
+      <span id="idea-difficulty" class="badge"></span>
+      <span id="idea-status" class="badge"></span>
+      <span id="idea-repo" class="meta-text"></span>
+    </div>
+    <div id="idea-description" class="idea-section"></div>
+    <details id="idea-why-section" class="idea-details">
+      <summary>Why this feature?</summary>
+      <div id="idea-why"></div>
+    </details>
+    <details id="idea-code-section" class="idea-details">
+      <summary>Code Preview</summary>
+      <pre id="idea-code" class="code-block"></pre>
+    </details>
+    <details id="idea-mock-section" class="idea-details">
+      <summary>Mock UI Preview</summary>
+      <iframe id="idea-mock-iframe" class="mock-iframe" sandbox="allow-same-origin"></iframe>
+    </details>
+    <div class="idea-actions">
+      <button id="idea-create-issue" class="btn btn-primary btn-sm">Create GitHub Issue</button>
+      <button id="idea-reject" class="btn btn-ghost btn-sm btn-danger-text">Reject</button>
+    </div>
+  </div>
+
+  <!-- Task Result Panel -->
+  <div id="result-overlay" class="overlay hidden"></div>
+  <div id="result-panel" class="detail-panel hidden">
+    <div class="detail-header">
+      <h2 id="result-title"></h2>
+      <button id="result-close" class="btn-icon-only" title="Close">✕</button>
+    </div>
+    <div class="result-meta-bar">
+      <span id="result-status" class="badge"></span>
+      <span id="result-type" class="meta-text"></span>
+      <span id="result-time" class="meta-text"></span>
+    </div>
+    <div id="result-output" class="result-output"></div>
+    <div id="result-live" class="result-live hidden">
+      <div class="spinner-sm"></div>
+      <span>Task running… streaming output</span>
+    </div>
+  </div>
+
+  <!-- Generate Ideas Repo Selector Modal -->
+  <div id="gen-overlay" class="overlay hidden"></div>
+  <div id="gen-modal" class="modal hidden">
+    <h3>Select a repo to generate ideas</h3>
+    <select id="gen-repo-select" class="select-input" style="width:100%;margin:12px 0;"></select>
+    <div class="modal-actions">
+      <button id="gen-cancel" class="btn btn-ghost btn-sm">Cancel</button>
+      <button id="gen-confirm" class="btn btn-primary btn-sm">Generate</button>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
