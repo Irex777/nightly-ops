@@ -334,10 +334,15 @@ class TaskRunner {
    * @returns {Promise<void>}
    */
   _cloneRepo(fullName, destDir) {
+    // Read GitHub token from settings for auth
+    const tokenRow = this.db.get('SELECT value FROM settings WHERE key = ?', ['github_token']);
+    const ghToken = tokenRow ? tokenRow.value : process.env.GH_TOKEN;
+
     return new Promise((resolve, reject) => {
       const proc = spawn('gh', ['repo', 'clone', fullName, destDir], {
         stdio: ['ignore', 'pipe', 'pipe'],
         timeout: 120000, // 2 min clone timeout
+        env: { ...process.env, GH_TOKEN: ghToken },
       });
 
       let stderr = '';
@@ -376,16 +381,26 @@ class TaskRunner {
    * @returns {Promise<string>} Captured stdout output
    */
   _runClaudeCode(workDir, prompt, taskId, repoName, taskType) {
+    // Build Claude Code env with ZAI/GLM config
+    const zaiKey = this.db.get('SELECT value FROM settings WHERE key = ?', ['zai_api_key']);
+    const claudeEnv = {
+      ...process.env,
+      TERM: 'dumb',
+      NO_COLOR: '1',
+      // GLM via ZAI config
+      ANTHROPIC_AUTH_TOKEN: zaiKey ? zaiKey.value : process.env.ANTHROPIC_AUTH_TOKEN,
+      ANTHROPIC_BASE_URL: process.env.ANTHROPIC_BASE_URL || 'https://api.z.ai/api/anthropic',
+      ANTHROPIC_DEFAULT_SONNET_MODEL: process.env.ANTHROPIC_DEFAULT_SONNET_MODEL || 'glm-5.1',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: process.env.ANTHROPIC_DEFAULT_OPUS_MODEL || 'glm-5.1',
+      API_TIMEOUT_MS: process.env.API_TIMEOUT_MS || '3000000',
+      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
+    };
+
     return new Promise((resolve, reject) => {
       const proc = spawn('claude', ['--acp', '--stdio'], {
         cwd: workDir,
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: {
-          ...process.env,
-          // Ensure no interactive prompts
-          TERM: 'dumb',
-          NO_COLOR: '1',
-        },
+        env: claudeEnv,
       });
 
       let stdout = '';
