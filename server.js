@@ -1,6 +1,7 @@
 // server.js — Express app: static serving, API routes, health check, SSE, runner
 
 const express = require('express');
+const session = require('express-session');
 const path = require('path');
 const { execSync } = require('child_process');
 const config = require('./config');
@@ -10,11 +11,49 @@ const { EventManager } = require('./sse');
 const { TaskRunner } = require('./runner');
 const ai = require('./ai');
 
+// ─── Auth Config ────────────────────────────────────────────────────────────
+
+const ADMIN_USER = process.env.ADMIN_USER || 'admin';
+const ADMIN_PASS = process.env.ADMIN_PASS || 'changeme';
+const SESSION_SECRET = process.env.SESSION_SECRET || 'nightly-ops-secret';
+
 const app = express();
 
 // ─── Middleware ──────────────────────────────────────────────────────────────
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Session middleware
+app.use(session({
+  name: 'nightly-ops.sid',
+  secret: SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+  },
+}));
+
+// ─── Auth Middleware ─────────────────────────────────────────────────────────
+
+// Public API routes that don't require authentication
+const PUBLIC_API_ROUTES = ['/api/login', '/api/logout', '/api/health'];
+
+// Auth middleware for /api/* routes
+app.use('/api', (req, res, next) => {
+  if (PUBLIC_API_ROUTES.includes(req.path)) return next();
+  if (req.session && req.session.authenticated) return next();
+  return res.status(401).json({ error: 'Authentication required' });
+});
+
+// Redirect unauthenticated browser requests from / to /login
+const authRedirect = (req, res, next) => {
+  if (req.session && req.session.authenticated) return next();
+  return res.redirect('/login');
+};
 
 // X-Accel-Buffering: no — helps SSE through Cloudflare/nginx
 app.use((_req, res, next) => {
@@ -36,6 +75,140 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 let eventManager = null;
 let runner = null;
+
+// ─── Login Page ─────────────────────────────────────────────────────────────
+
+app.get('/login', (req, res) => {
+  // Already logged in? Redirect to app
+  if (req.session && req.session.authenticated) return res.redirect('/');
+
+  const error = req.query.error === '1' ? '<p style="color:#ef4444;margin-top:12px;text-align:center;">Invalid username or password</p>' : '';
+
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nightly Ops — Login</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0f172a;
+      color: #e2e8f0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .login-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 40px;
+      width: 100%;
+      max-width: 380px;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+    }
+    .login-card h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+      color: #f8fafc;
+    }
+    .login-card p.subtitle {
+      font-size: 0.875rem;
+      color: #94a3b8;
+      margin-bottom: 28px;
+    }
+    label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #94a3b8;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    input[type="text"],
+    input[type="password"] {
+      width: 100%;
+      padding: 10px 12px;
+      margin-bottom: 18px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      color: #e2e8f0;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input[type="text"]:focus,
+    input[type="password"]:focus {
+      border-color: #3b82f6;
+    }
+    button {
+      width: 100%;
+      padding: 11px;
+      background: #3b82f6;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    button:hover { background: #2563eb; }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <h1>Nightly Ops</h1>
+    <p class="subtitle">Sign in to continue</p>
+    <form method="POST" action="/api/login">
+      <label for="username">Username</label>
+      <input type="text" id="username" name="username" autocomplete="username" required autofocus>
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" autocomplete="current-password" required>
+      ${error}
+      <button type="submit" style="margin-top:8px;">Sign In</button>
+    </form>
+  </div>
+</body>
+</html>`);
+});
+
+// ─── Auth API Routes ────────────────────────────────────────────────────────
+
+app.post('/api/login', (req, res) => {
+  const { username, password } = req.body || {};
+  if (username === ADMIN_USER && password === ADMIN_PASS) {
+    req.session.authenticated = true;
+    // If browser form submission, redirect to app
+    const accept = req.get('Accept') || '';
+    if (accept.includes('text/html')) {
+      return res.redirect('/');
+    }
+    return res.json({ ok: true });
+  }
+  // Failed — redirect browser back with error, or return JSON
+  const accept = req.get('Accept') || '';
+  if (accept.includes('text/html')) {
+    return res.redirect('/login?error=1');
+  }
+  return res.status(401).json({ error: 'Invalid username or password' });
+});
+
+app.post('/api/logout', (req, res) => {
+  req.session.destroy(() => {
+    const accept = req.get('Accept') || '';
+    if (accept.includes('text/html')) {
+      return res.redirect('/login');
+    }
+    return res.json({ ok: true });
+  });
+});
 
 // ─── Health Check ───────────────────────────────────────────────────────────
 
@@ -368,6 +541,9 @@ app.post('/api/settings/test-claude', (_req, res) => {
 });
 
 // ─── SPA Fallback ───────────────────────────────────────────────────────────
+
+// Redirect unauthenticated browser requests on index to login
+app.get('/', authRedirect, (_req, res, next) => { next(); });
 
 app.get('*', (_req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));

@@ -384,6 +384,10 @@ html, body {
 .badge-status-approved { background: rgba(16, 185, 129, 0.15); color: var(--success); }
 .badge-status-implemented { background: rgba(59, 130, 246, 0.15); color: var(--accent); }
 .badge-status-rejected { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
+.badge-status-pending { background: rgba(107, 114, 128, 0.2); color: var(--text-dim); }
+.badge-status-running { background: rgba(245, 158, 11, 0.15); color: var(--warning); animation: pulse 2s infinite; }
+.badge-status-completed { background: rgba(16, 185, 129, 0.15); color: var(--success); }
+.badge-status-failed { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
 
 .badge-running { background: rgba(245, 158, 11, 0.15); color: var(--warning); animation: pulse-status 1.5s ease infinite; }
 .badge-completed { background: rgba(16, 185, 129, 0.15); color: var(--success); }
@@ -780,8 +784,8 @@ html, body {
   font-size: 13px;
 }
 
-.test-result.ok { background: rgba(16, 185, 129, 0.15); color: var(--success); }
-.test-result.fail { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
+.test-result.ok, .test-result.success { background: rgba(16, 185, 129, 0.15); color: var(--success); }
+.test-result.fail, .test-result.error { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
 
 /* ─── Toast ────────────────────────────────────────────────────────────────── */
 
