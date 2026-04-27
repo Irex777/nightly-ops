@@ -8,11 +8,20 @@ const db = require('./db');
  * Run a gh CLI command and return parsed JSON.
  */
 function ghCommand(args) {
+  // Read GitHub token from DB settings
+  const row = db.get('SELECT value FROM settings WHERE key = ?', ['github_token']);
+  const token = row ? row.value : null;
+
+  if (!token) {
+    throw new Error('GitHub token not configured. Add it in Settings.');
+  }
+
   try {
     const result = execSync(`gh ${args}`, {
       encoding: 'utf-8',
       timeout: 30000,
       maxBuffer: 1024 * 1024,
+      env: { ...process.env, GH_TOKEN: token },
     });
     return JSON.parse(result.trim());
   } catch (err) {
