@@ -539,10 +539,35 @@ app.post('/api/settings/test-zai', async (_req, res) => {
 // Test Claude Code
 app.post('/api/settings/test-claude', (_req, res) => {
   try {
-    const result = execSync('claude --version', { encoding: 'utf-8', timeout: 10000 }).trim();
-    return res.json({ ok: true, message: `Claude Code found: ${result}` });
+    // Check claude binary exists
+    const version = execSync('claude --version', { encoding: 'utf-8', timeout: 10000 }).trim();
+
+    // Quick smoke test: run a simple prompt through GLM
+    const zaiKey = db.get('SELECT value FROM settings WHERE key = ?', ['zai_api_key']);
+    if (!zaiKey || !zaiKey.value) {
+      return res.json({ ok: false, message: 'Claude Code CLI found but no ZAI API key configured' });
+    }
+
+    const testResult = execSync(
+      'claude -p "Say OK" --output-format text --model opus',
+      {
+        encoding: 'utf-8',
+        timeout: 30000,
+        env: {
+          ...process.env,
+          ANTHROPIC_API_KEY: zaiKey.value,
+          ANTHROPIC_BASE_URL: 'https://api.z.ai/api/anthropic',
+          ANTHROPIC_DEFAULT_SONNET_MODEL: 'glm-5.1',
+          ANTHROPIC_DEFAULT_OPUS_MODEL: 'glm-5.1',
+          API_TIMEOUT_MS: '3000000',
+          CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
+        },
+      }
+    ).trim();
+
+    return res.json({ ok: true, message: `${version} — GLM response: "${testResult.substring(0, 50)}"` });
   } catch (err) {
-    return res.json({ ok: false, message: 'Claude Code not found or not working' });
+    return res.json({ ok: false, message: `Claude Code error: ${err.message.substring(0, 200)}` });
   }
 });
 

@@ -388,7 +388,7 @@ class TaskRunner {
       TERM: 'dumb',
       NO_COLOR: '1',
       // GLM via ZAI config
-      ANTHROPIC_AUTH_TOKEN: zaiKey ? zaiKey.value : process.env.ANTHROPIC_AUTH_TOKEN,
+      ANTHROPIC_API_KEY: zaiKey ? zaiKey.value : process.env.ANTHROPIC_API_KEY,
       ANTHROPIC_BASE_URL: process.env.ANTHROPIC_BASE_URL || 'https://api.z.ai/api/anthropic',
       ANTHROPIC_DEFAULT_SONNET_MODEL: process.env.ANTHROPIC_DEFAULT_SONNET_MODEL || 'glm-5.1',
       ANTHROPIC_DEFAULT_OPUS_MODEL: process.env.ANTHROPIC_DEFAULT_OPUS_MODEL || 'glm-5.1',
@@ -397,9 +397,16 @@ class TaskRunner {
     };
 
     return new Promise((resolve, reject) => {
-      const proc = spawn('claude', ['--acp', '--stdio'], {
+      // Use --print mode with --output-format json for structured results
+      // --dangerously-skip-permissions for autonomous runs
+      const proc = spawn('claude', [
+        '-p', prompt,
+        '--output-format', 'json',
+        '--dangerously-skip-permissions',
+        '--model', 'opus',
+      ], {
         cwd: workDir,
-        stdio: ['pipe', 'pipe', 'pipe'],
+        stdio: ['ignore', 'pipe', 'pipe'],
         env: claudeEnv,
       });
 
@@ -470,16 +477,6 @@ class TaskRunner {
         this.running.delete(taskId);
         reject(new Error(`Failed to spawn claude: ${err.message}`));
       });
-
-      // Write the prompt to stdin and close it
-      try {
-        proc.stdin.write(prompt);
-        proc.stdin.end();
-      } catch (err) {
-        clearTimeout(timeout);
-        this.running.delete(taskId);
-        reject(new Error(`Failed to write prompt: ${err.message}`));
-      }
     });
   }
 
