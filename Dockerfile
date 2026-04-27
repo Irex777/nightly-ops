@@ -13,10 +13,6 @@ RUN GH_VER="2.63.2" && \
 RUN npm install -g @anthropic-ai/claude-code && \
     claude --version
 
-# Create non-root user for Claude Code (--dangerously-skip-permissions requires non-root)
-RUN adduser -D -u 1001 appuser && \
-    chown -R appuser:appuser /app
-
 WORKDIR /app
 
 # Copy package files and install dependencies
@@ -26,8 +22,12 @@ RUN npm ci --omit=dev
 # Copy application source
 COPY . .
 
-# Ensure data directory exists for SQLite (writable by appuser)
-RUN mkdir -p /app/data && chown -R appuser:appuser /app/data
+# Ensure data and temp dirs exist
+RUN mkdir -p /app/data /tmp/nightly-ops
+
+# Create non-root user and set ownership
+RUN adduser -D -u 1001 appuser && \
+    chown -R appuser:appuser /app /tmp/nightly-ops
 
 # Expose the default port
 EXPOSE 3000
