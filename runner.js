@@ -254,7 +254,7 @@ class TaskRunner {
            VALUES (?, ?, 'pending', ?, ?)`,
           [repo.id, tc.task_type, now, JSON.stringify({ triggered: 'nightly' })]
         );
-        const task = this.db.get('SELECT last_insert_rowid() as id');
+        const task = this.db.get('SELECT MAX(id) as id FROM tasks');
         tasksCreated.push({
           id: task.id,
           repo: repo.name,
