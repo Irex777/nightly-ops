@@ -398,7 +398,7 @@ class TaskRunner {
 
     return new Promise((resolve, reject) => {
       // Use --print mode with --output-format json for structured results
-      // --dangerously-skip-permissions for autonomous runs
+      // Run as non-root to allow --dangerously-skip-permissions
       const proc = spawn('claude', [
         '-p', prompt,
         '--output-format', 'json',
