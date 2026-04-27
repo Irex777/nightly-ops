@@ -398,11 +398,11 @@ class TaskRunner {
 
     return new Promise((resolve, reject) => {
       // Use --print mode with --output-format json for structured results
-      // Run as non-root to allow --dangerously-skip-permissions
+      // --bare: minimal mode, no permission prompts, API key auth only
       const proc = spawn('claude', [
         '-p', prompt,
         '--output-format', 'json',
-        '--dangerously-skip-permissions',
+        '--bare',
         '--model', 'opus',
       ], {
         cwd: workDir,
