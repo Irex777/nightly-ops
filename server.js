@@ -44,7 +44,7 @@ const PUBLIC_API_ROUTES = ['/api/login', '/api/logout', '/api/health'];
 
 // Auth middleware for /api/* routes
 app.use('/api', (req, res, next) => {
-  if (PUBLIC_API_ROUTES.includes(req.path)) return next();
+  if (PUBLIC_API_ROUTES.includes(req.originalUrl)) return next();
   if (req.session && req.session.authenticated) return next();
   return res.status(401).json({ error: 'Authentication required' });
 });
