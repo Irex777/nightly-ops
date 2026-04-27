@@ -32,7 +32,7 @@ app.use(session({
   saveUninitialized: false,
   cookie: {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: false, // Behind Cloudflare (HTTP proxy internally)
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
   },
 }));
