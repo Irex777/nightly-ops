@@ -69,8 +69,6 @@ app.get(['/index.html', '/app.js', '/style.css'], (_req, res, next) => {
   next();
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
-
 // ─── Instances (initialized in start()) ──────────────────────────────────────
 
 let eventManager = null;
@@ -177,6 +175,14 @@ app.get('/login', (req, res) => {
   </div>
 </body>
 </html>`);
+});
+
+// Serve static files only to authenticated users
+app.use((req, res, next) => {
+  if (req.session && req.session.authenticated) {
+    return express.static(path.join(__dirname, 'public'))(req, res, next);
+  }
+  next();
 });
 
 // ─── Auth API Routes ────────────────────────────────────────────────────────
@@ -542,10 +548,8 @@ app.post('/api/settings/test-claude', (_req, res) => {
 
 // ─── SPA Fallback ───────────────────────────────────────────────────────────
 
-// Redirect unauthenticated browser requests on index to login
-app.get('/', authRedirect, (_req, res, next) => { next(); });
-
-app.get('*', (_req, res) => {
+// All non-API, non-static routes: require auth, serve index.html (SPA)
+app.get('*', authRedirect, (_req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
